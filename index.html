@@ -25,6 +25,10 @@ button {
   font-size: 1rem;
   cursor: pointer;
 }
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
 pre {
   background: #f6f6f6;
   padding: 10px;
@@ -34,6 +38,7 @@ pre {
   font-size: 0.85rem;
 }
 .note { color:#555; font-size:0.9rem; margin-top:6px; }
+.success { color: #0a0; }
 </style>
 
 <!-- Load local PDF.js build -->
@@ -45,7 +50,7 @@ pre {
 </head>
 
 <body>
-<h2>Dra & släpp ditt schema (PDF) → skapa .ics v1</h2>
+<h2>Dra & släpp ditt schema (PDF) → skapa .ics v2</h2>
 
 <div id="drop" class="drop">
   Dra PDF hit eller klicka för att välja fil
@@ -76,6 +81,7 @@ async function handleFile(file){
   if(!file) return;
   if(!file.name.toLowerCase().endsWith('.pdf')){ alert('Välj en PDF-fil.'); return; }
   status.textContent='Läser PDF...';
+  status.className='note';
   try {
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -87,37 +93,42 @@ async function handleFile(file){
       const pageText = content.items.map(it => it.str).join(' ');
       text += '\n' + pageText;
     }
-    // Remove multiple spaces
+    // Remove multiple spaces but keep structure
     text = text.replace(/\s+/g, ' ');
     const events = parseText(text);
     if(events.length===0){
-      status.textContent='Inga rader hittade. (Kontrollera kolumnrubriker och format)';
+      status.textContent='Inga rader hittade. Förväntar format: YYYY-MM-DD Dag TTMM TTMM KOD';
+      status.className='note';
       preview.textContent=text.slice(0,800)+'…'; // show raw text preview
       downloadBtn.disabled=true;
       return;
     }
     lastIcs = buildIcs(events);
-    preview.textContent = events.map(e => `${e.date} ${e.from}-${e.to} ${e.code}`).join('\n');
+    preview.textContent = events.map(e => `${e.date} ${e.from}-${e.to} ${e.code} ${e.notes || ''}`).join('\n');
     downloadBtn.disabled=false;
-    status.textContent = `${events.length} rader hittade.`;
+    status.textContent = `✓ ${events.length} schemapass hittade och redo att ladda ner!`;
+    status.className='note success';
   } catch(err){
     console.error('PDF error:', err);
     status.textContent='Fel vid läsning av PDF: ' + (err.message || err);
+    status.className='note';
   }
 }
 
-// Try to match "YYYY-MM-DD Mån 0700 1500 DAGPO" etc.
+// Match "YYYY-MM-DD DayName TTMM TTMM CODE" with optional notes at end
+// More flexible spacing with \s+
 function parseText(txt){
-  const pattern = /\b(20\d{2}-\d{2}-\d{2})\s+\S+\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖa-zåäö0-9\-]+)/g;
+  const pattern = /\b(20\d{2}-\d{2}-\d{2})\s+\w+\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})(?:\s+\d+:\d+\s+\d+:\d+)?(?:\s+(.+?)(?=20\d{2}-\d{2}-\d{2}|$))?/gi;
   const events=[];
   let m;
   while((m=pattern.exec(txt))!==null){
-    const [_, date, from, to, code] = m;
+    const [_, date, from, to, code, notes] = m;
     events.push({
       date,
       from: fixTime(from),
       to: fixTime(to),
-      code: code || 'Schema'
+      code: code.trim(),
+      notes: notes ? notes.trim() : ''
     });
   }
   return events;
@@ -126,14 +137,43 @@ function parseText(txt){
 function fixTime(s){ return s.padStart(4,'0'); }
 
 function buildIcs(events){
-  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//pdf2ics//'];
+  const lines=[
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//pdf2ics//',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Arbetsschema',
+    'X-WR-TIMEZONE:Europe/Stockholm',
+    'BEGIN:VTIMEZONE',
+    'TZID:Europe/Stockholm',
+    'BEGIN:DAYLIGHT',
+    'TZOFFSETFROM:+0100',
+    'TZOFFSETTO:+0200',
+    'DTSTART:19700329T020000',
+    'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
+    'END:DAYLIGHT',
+    'BEGIN:STANDARD',
+    'TZOFFSETFROM:+0200',
+    'TZOFFSETTO:+0100',
+    'DTSTART:19701025T030000',
+    'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
+    'END:STANDARD',
+    'END:VTIMEZONE'
+  ];
+  
   for(const e of events){
+    const uid = e.date.replace(/-/g,'') + e.from + e.to + Math.random().toString(36).slice(2,6) + '@pdf2ics';
     lines.push('BEGIN:VEVENT');
-    lines.push('UID:'+Math.random().toString(36).slice(2)+'@pdf2ics');
-    lines.push('DTSTART;TZID=Europe/Stockholm:'+e.date.replace(/-/g,'')+'T'+e.from+'00');
-    lines.push('DTEND;TZID=Europe/Stockholm:'+e.date.replace(/-/g,'')+'T'+e.to+'00');
-    lines.push('SUMMARY:'+e.code);
-    lines.push('DESCRIPTION:Kod '+e.code);
+    lines.push('UID:' + uid);
+    lines.push('DTSTAMP:' + new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z');
+    lines.push('DTSTART;TZID=Europe/Stockholm:' + e.date.replace(/-/g,'') + 'T' + e.from + '00');
+    lines.push('DTEND;TZID=Europe/Stockholm:' + e.date.replace(/-/g,'') + 'T' + e.to + '00');
+    lines.push('SUMMARY:' + e.code);
+    if(e.notes){
+      lines.push('DESCRIPTION:' + e.notes);
+    }
+    lines.push('STATUS:CONFIRMED');
     lines.push('END:VEVENT');
   }
   lines.push('END:VCALENDAR');
@@ -141,7 +181,7 @@ function buildIcs(events){
 }
 
 downloadBtn.addEventListener('click',()=>{
-  const blob=new Blob([lastIcs],{type:'text/calendar'});
+  const blob=new Blob([lastIcs],{type:'text/calendar;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url; a.download='schema.ics'; a.click();
