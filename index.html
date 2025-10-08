@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics v5</title>
+<title>Schema PDF → .ics v6</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -200,7 +200,7 @@ async function handleFile(file){
 // Match "YYYY-MM-DD DayName TTMM TTMM CODE Rast Tid [Anteckningar]"
 // Pattern captures everything after Tid column as potential notes
 function parseText(txt){
-  const pattern = /\b(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})\s+\d+:\d+\s+\d+:\d+/gi;
+  const pattern = /(?:\d+\s+)?(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})\s+\d+:\d+\s+\d+:\d+/gi;
   const events=[];
   let m;
   while((m=pattern.exec(txt))!==null){
