@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics</title>
+<title>Schema PDF → .ics v4</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -129,7 +129,7 @@ pre {
 
 <body>
 <div class="container">
-<h2>Schema PDF → .ics v3</h2>
+<h2>Schema PDF → .ics</h2>
 <div class="subtitle">Konvertera ditt arbetsschema till kalenderfil</div>
 
 <div id="drop" class="drop">
@@ -197,20 +197,21 @@ async function handleFile(file){
   }
 }
 
-// Match "YYYY-MM-DD DayName TTMM TTMM CODE" with optional notes at end
-// More flexible spacing with \s+
+// Match "YYYY-MM-DD DayName TTMM TTMM CODE Rast Tid [Anteckningar]"
+// Pattern captures everything after Tid column as potential notes
 function parseText(txt){
-  const pattern = /\b(20\d{2}-\d{2}-\d{2})\s+\w+\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})(?:\s+\d+:\d+\s+\d+:\d+)?(?:\s+(.+?)(?=20\d{2}-\d{2}-\d{2}|$))?/gi;
+  const pattern = /\b(20\d{2}-\d{2}-\d{2})\s+\w+\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})\s+\d+:\d+\s+\d+:\d+\s*(.+?)(?=\s+20\d{2}-\d{2}-\d{2}|$)/gi;
   const events=[];
   let m;
   while((m=pattern.exec(txt))!==null){
     const [_, date, from, to, code, notes] = m;
+    const cleanNotes = notes ? notes.trim() : '';
     events.push({
       date,
       from: fixTime(from),
       to: fixTime(to),
       code: code.trim(),
-      notes: notes ? notes.trim() : ''
+      notes: cleanNotes && cleanNotes.length > 2 ? cleanNotes : ''
     });
   }
   return events;
