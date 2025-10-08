@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics</title>
+<title>Schema PDF → .ics v12</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -257,56 +257,55 @@ function parseTable(txt){
   // Clean up excessive spaces but keep structure
   txt = txt.replace(/\s+/g, ' ').trim();
   
-  // Find all week numbers before dates
-  const weekPattern = /(?:^|\s)(\d{1,2})\s+(20\d{2}-\d{2}-\d{2})/g;
-  const weekMap = new Map();
-  let wm;
-  while((wm = weekPattern.exec(txt)) !== null){
-    const weekNum = wm[1];
-    const date = wm[2];
-    if(parseInt(weekNum) >= 1 && parseInt(weekNum) <= 53){
-      weekMap.set(date, weekNum);
-    }
+  // Strategy: Find all dates first, then look at what comes after each date
+  const allDates = [];
+  const datePattern = /(20\d{2}-\d{2}-\d{2})/g;
+  let dm;
+  while((dm = datePattern.exec(txt)) !== null){
+    allDates.push({
+      date: dm[1],
+      index: dm.index
+    });
   }
   
-  // Match rows: date + day + OPTIONAL(times + code + rast + tid)
-  // This captures both work days and days off
-  const rowPattern = /(20\d{2}-\d{2}-\d{2})\s+(\w+)(?:\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]+?)\s+(\d+:\d+)\s+(\d+:\d+))?/gi;
-  
   const rows = [];
-  let match;
   let currentWeek = '';
   
-  while((match = rowPattern.exec(txt)) !== null){
-    const [fullMatch, datum, dag, från, till, kod, rast, tid] = match;
+  for(let i = 0; i < allDates.length; i++){
+    const dateInfo = allDates[i];
+    const date = dateInfo.date;
+    const startIdx = dateInfo.index;
     
-    // Skip rows without work (no times/code)
-    if(!från || !till || !kod) continue;
+    // Get text from this date to the next date (or end)
+    const endIdx = i < allDates.length - 1 ? allDates[i + 1].index : txt.length;
+    const rowText = txt.slice(startIdx, endIdx);
     
-    // Update current week if this date has one
-    if(weekMap.has(datum)){
-      currentWeek = weekMap.get(datum);
+    // Check if there's a week number just before this date
+    const beforeDate = txt.slice(Math.max(0, startIdx - 10), startIdx);
+    const weekMatch = beforeDate.match(/(\d{1,2})\s*$/);
+    if(weekMatch && parseInt(weekMatch[1]) >= 1 && parseInt(weekMatch[1]) <= 53){
+      currentWeek = weekMatch[1];
     }
     
-    // Look for notes after this match
-    const afterMatch = txt.slice(match.index + fullMatch.length);
-    const notesMatch = afterMatch.match(/^\s*([A-ZÅÄÖ][^0-9]{5,}?)(?=\s+(?:\d{1,2}\s+)?20\d{2}-\d{2}-\d{2}|$)/i);
-    let anteckningar = '';
-    if(notesMatch && notesMatch[1]){
-      anteckningar = notesMatch[1].trim();
-    }
+    // Parse the row: date dag from to code rast tid [notes]
+    const rowMatch = rowText.match(/^(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]+?)\s+(\d+:\d+)\s+(\d+:\d+)(.*)$/i);
     
-    rows.push({
-      vecka: currentWeek,
-      datum: datum,
-      dag: dag,
-      från: fixTime(från),
-      till: fixTime(till),
-      kod: kod.trim(),
-      rast: rast,
-      tid: tid,
-      anteckningar: anteckningar
-    });
+    if(rowMatch){
+      const [_, datum, dag, från, till, kod, rast, tid, rest] = rowMatch;
+      const anteckningar = rest.trim();
+      
+      rows.push({
+        vecka: currentWeek,
+        datum: datum,
+        dag: dag,
+        från: fixTime(från),
+        till: fixTime(till),
+        kod: kod.trim(),
+        rast: rast,
+        tid: tid,
+        anteckningar: anteckningar
+      });
+    }
   }
   
   return rows;
