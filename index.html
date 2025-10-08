@@ -256,7 +256,8 @@ function parseTable(txt){
   
   // Pattern to match a complete row
   // Optional week number, then date, day, from, to, code, rast, tid, optional notes
-  const rowPattern = /(\d{1,2})?\s*(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,15}?)\s+(\d+:\d+)\s+(\d+:\d+)\s*([^0-9]*?)(?=(?:\d{1,2}\s+)?20\d{2}-\d{2}-\d{2}|$)/gi;
+  // const rowPattern = /(\d{1,2})?\s*(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,15}?)\s+(\d+:\d+)\s+(\d+:\d+)\s*([^0-9]*?)(?=(?:\d{1,2}\s+)?20\d{2}-\d{2}-\d{2}|$)/gi;
+  const pattern = /\b(20\d{2}-\d{2}-\d{2})\s+\w+\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})(?:\s+\d+:\d+\s+\d+:\d+)?(?:\s+(.+?)(?=20\d{2}-\d{2}-\d{2}|$))?/gi;
   
   const rows = [];
   let match;
