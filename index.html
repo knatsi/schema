@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics v6</title>
+<title>Schema PDF → .ics</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -20,7 +20,7 @@ body {
   background: white;
   border-radius: 20px;
   padding: 40px;
-  max-width: 700px;
+  max-width: 900px;
   width: 100%;
   box-shadow: 0 8px 30px rgba(101, 84, 68, 0.15);
 }
@@ -93,16 +93,37 @@ h3 {
   color: #5a4a3a;
   font-size: 1.3rem;
 }
-pre {
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
   background: #faf8f3;
-  padding: 20px;
   border-radius: 12px;
-  max-height: 300px;
-  overflow: auto;
-  font-size: 0.9rem;
-  border: 1px solid #e8e0d5;
-  line-height: 1.6;
+  overflow: hidden;
+}
+th {
+  background: #6b8e23;
+  color: white;
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+}
+td {
+  padding: 8px;
+  border-bottom: 1px solid #e8e0d5;
   color: #5a4a3a;
+}
+tr:last-child td {
+  border-bottom: none;
+}
+tr:hover {
+  background: #f5f1e8;
+}
+.table-wrapper {
+  max-height: 400px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid #e8e0d5;
 }
 .note { 
   color: #8b7355;
@@ -141,16 +162,36 @@ pre {
 <button id="downloadBtn" disabled>📥 Hämta .ics</button>
 <div id="status" class="note"></div>
 
-<h3>Förhandsvisning</h3>
-<pre id="preview">Ingen fil laddad än...</pre>
+<h3>Förhandsvisning av tolkat schema</h3>
+<div class="table-wrapper">
+  <table id="preview">
+    <thead>
+      <tr>
+        <th>Vecka</th>
+        <th>Datum</th>
+        <th>Dag</th>
+        <th>Från</th>
+        <th>Till</th>
+        <th>Kod</th>
+        <th>Rast</th>
+        <th>Tid</th>
+        <th>Anteckningar</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="9" style="text-align:center;padding:20px;">Ingen fil laddad än...</td></tr>
+    </tbody>
+  </table>
+</div>
 </div>
 
 <script>
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('fileInput');
 const downloadBtn = document.getElementById('downloadBtn');
-const preview = document.getElementById('preview');
+const preview = document.getElementById('preview').querySelector('tbody');
 const status = document.getElementById('status');
+let parsedRows = [];
 let lastIcs = '';
 
 drop.addEventListener('click', () => fileInput.click());
@@ -175,21 +216,33 @@ async function handleFile(file){
       const pageText = content.items.map(it => it.str).join(' ');
       text += '\n' + pageText;
     }
-    // Remove multiple spaces but keep structure
-    text = text.replace(/\s+/g, ' ');
-    const events = parseText(text);
-    if(events.length===0){
-      status.textContent='Inga rader hittade. Förväntar format: YYYY-MM-DD Dag TTMM TTMM KOD';
+    
+    parsedRows = parseTable(text);
+    
+    if(parsedRows.length===0){
+      status.textContent='Inga rader hittade. Kontrollera PDF-format.';
       status.className='note';
-      preview.textContent=text.slice(0,800)+'…'; // show raw text preview
+      preview.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Ingen data hittades</td></tr>';
       downloadBtn.disabled=true;
       return;
     }
-    lastIcs = buildIcs(events);
-    preview.textContent = events.map(e => `${e.date} ${e.from}-${e.to} ${e.code} ${e.notes || ''}`).join('\n');
-    downloadBtn.disabled=false;
-    status.textContent = `✓ ${events.length} schemapass hittade och redo att ladda ner!`;
-    status.className='note success';
+    
+    displayTable(parsedRows);
+    
+    // Filter rows that have date and times for .ics
+    const validEvents = parsedRows.filter(r => r.datum && r.från && r.till && r.kod);
+    
+    if(validEvents.length > 0) {
+      lastIcs = buildIcs(validEvents);
+      downloadBtn.disabled=false;
+      status.textContent = `✓ ${validEvents.length} arbetspass redo att exportera!`;
+      status.className='note success';
+    } else {
+      status.textContent = `Tabellen tolkad (${parsedRows.length} rader) men inga giltiga arbetspass hittade`;
+      status.className='note';
+      downloadBtn.disabled=true;
+    }
+    
   } catch(err){
     console.error('PDF error:', err);
     status.textContent='Fel vid läsning av PDF: ' + (err.message || err);
@@ -197,28 +250,53 @@ async function handleFile(file){
   }
 }
 
-// Match "YYYY-MM-DD DayName TTMM TTMM CODE Rast Tid [Anteckningar]"
-// Pattern captures everything after Tid column as potential notes
-function parseText(txt){
-  const pattern = /(?:\d+\s+)?(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,10})\s+\d+:\d+\s+\d+:\d+/gi;
-  const events=[];
-  let m;
-  while((m=pattern.exec(txt))!==null){
-    const [fullMatch, date, day, from, to, code] = m;
-    // Look for notes after this match, up to the next date or end
-    const afterMatch = txt.slice(m.index + fullMatch.length);
-    const notesMatch = afterMatch.match(/^\s*([^\d][^0-9]{2,}?)(?=\s+20\d{2}-\d{2}-\d{2}|$)/);
-    const notes = notesMatch ? notesMatch[1].trim() : '';
+function parseTable(txt){
+  // Clean up text
+  txt = txt.replace(/\s+/g, ' ').trim();
+  
+  // Pattern to match a complete row
+  // Optional week number, then date, day, from, to, code, rast, tid, optional notes
+  const rowPattern = /(\d{1,2})?\s*(20\d{2}-\d{2}-\d{2})\s+(\w+)\s+(\d{3,4})\s+(\d{3,4})\s+([A-ZÅÄÖ][A-ZÅÄÖ0-9\s]{1,15}?)\s+(\d+:\d+)\s+(\d+:\d+)\s*([^0-9]*?)(?=(?:\d{1,2}\s+)?20\d{2}-\d{2}-\d{2}|$)/gi;
+  
+  const rows = [];
+  let match;
+  
+  while((match = rowPattern.exec(txt)) !== null){
+    const [_, vecka, datum, dag, från, till, kod, rast, tid, anteckningar] = match;
     
-    events.push({
-      date,
-      from: fixTime(from),
-      to: fixTime(to),
-      code: code.trim(),
-      notes: notes && notes.length > 5 && !notes.includes(':') ? notes : ''
+    rows.push({
+      vecka: vecka || '',
+      datum: datum,
+      dag: dag,
+      från: fixTime(från),
+      till: fixTime(till),
+      kod: kod.trim(),
+      rast: rast,
+      tid: tid,
+      anteckningar: anteckningar.trim()
     });
   }
-  return events;
+  
+  return rows;
+}
+
+function displayTable(rows){
+  preview.innerHTML = '';
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.vecka}</td>
+      <td>${row.datum}</td>
+      <td>${row.dag}</td>
+      <td>${row.från}</td>
+      <td>${row.till}</td>
+      <td>${row.kod}</td>
+      <td>${row.rast}</td>
+      <td>${row.tid}</td>
+      <td>${row.anteckningar}</td>
+    `;
+    preview.appendChild(tr);
+  });
 }
 
 function fixTime(s){ return s.padStart(4,'0'); }
@@ -250,13 +328,14 @@ function buildIcs(events){
   ];
   
   for(const e of events){
-    const uid = e.date.replace(/-/g,'') + e.from + e.to + Math.random().toString(36).slice(2,6) + '@pdf2ics';
+    const uid = e.datum.replace(/-/g,'') + e.från + e.till + Math.random().toString(36).slice(2,6) + '@pdf2ics';
+    const summary = e.anteckningar ? e.kod + ', ' + e.anteckningar : e.kod;
+    
     lines.push('BEGIN:VEVENT');
     lines.push('UID:' + uid);
     lines.push('DTSTAMP:' + new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z');
-    lines.push('DTSTART;TZID=Europe/Stockholm:' + e.date.replace(/-/g,'') + 'T' + e.from + '00');
-    lines.push('DTEND;TZID=Europe/Stockholm:' + e.date.replace(/-/g,'') + 'T' + e.to + '00');
-    const summary = e.notes ? e.code + ', ' + e.notes : e.code;
+    lines.push('DTSTART;TZID=Europe/Stockholm:' + e.datum.replace(/-/g,'') + 'T' + e.från + '00');
+    lines.push('DTEND;TZID=Europe/Stockholm:' + e.datum.replace(/-/g,'') + 'T' + e.till + '00');
     lines.push('SUMMARY:' + summary);
     lines.push('STATUS:CONFIRMED');
     lines.push('END:VEVENT');
