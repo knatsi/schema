@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics v13</title>
+<title>Schema PDF → .ics trött</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -113,12 +113,8 @@ td {
   border-bottom: 1px solid #e8e0d5;
   color: #5a4a3a;
 }
-tr:last-child td {
-  border-bottom: none;
-}
-tr:hover {
-  background: #f5f1e8;
-}
+tr:last-child td { border-bottom: none; }
+tr:hover { background: #f5f1e8; }
 .table-wrapper {
   max-height: 400px;
   overflow: auto;
@@ -140,11 +136,9 @@ tr:hover {
 }
 </style>
 
-<!-- Load local PDF.js build -->
 <script src="pdfjs/pdf.min.js"></script>
 <script>
-  // Tell PDF.js where its worker file is
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "pdfjs/pdf.worker.min.js";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "pdfjs/pdf.worker.min.js";
 </script>
 </head>
 
@@ -214,14 +208,11 @@ async function handleFile(file){
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
       const pageText = content.items.map(it => it.str).join(' ');
-      text += '\n' + pageText;
+      text += ' ' + pageText;
     }
-    
+
     parsedRows = parseTable(text);
-    
-    // Debug: show raw text snippet
-    console.log('Raw PDF text (first 1000 chars):', text.slice(0, 1000));
-    
+
     if(parsedRows.length===0){
       status.textContent='Inga rader hittade. Kontrollera PDF-format.';
       status.className='note';
@@ -229,12 +220,10 @@ async function handleFile(file){
       downloadBtn.disabled=true;
       return;
     }
-    
+
     displayTable(parsedRows);
-    
-    // Filter rows that have date and times for .ics
+
     const validEvents = parsedRows.filter(r => r.datum && r.från && r.till && r.kod);
-    
     if(validEvents.length > 0) {
       lastIcs = buildIcs(validEvents);
       downloadBtn.disabled=false;
@@ -245,7 +234,7 @@ async function handleFile(file){
       status.className='note';
       downloadBtn.disabled=true;
     }
-    
+
   } catch(err){
     console.error('PDF error:', err);
     status.textContent='Fel vid läsning av PDF: ' + (err.message || err);
@@ -253,52 +242,51 @@ async function handleFile(file){
   }
 }
 
+// ✅ FIXED PARSER
 function parseTable(txt) {
-  // Normalize whitespace
   txt = txt.replace(/\s+/g, ' ').trim();
 
-  // Cut off everything before the main header
+  // Start only after the main header
   const headerIndex = txt.indexOf("Vecka Datum Dag Från Till Kod Rast Tid Anteckningar");
   if (headerIndex === -1) return [];
-  txt = txt.slice(headerIndex + 50); // skip header
+  txt = txt.slice(headerIndex + 50);
 
   const rows = [];
   let currentWeek = "";
   const datePattern = /(20\d{2}-\d{2}-\d{2})/g;
   let match;
 
+  const allDates = [];
   while ((match = datePattern.exec(txt)) !== null) {
-    const datum = match[1];
-    const startIdx = match.index;
+    allDates.push({ date: match[1], index: match.index });
+  }
 
-    // Peek ahead to next date or end
-    const nextMatch = datePattern.exec(txt);
-    const endIdx = nextMatch ? nextMatch.index : txt.length;
+  for (let i = 0; i < allDates.length; i++) {
+    const startIdx = allDates[i].index;
+    const endIdx = i < allDates.length - 1 ? allDates[i + 1].index : txt.length;
     const rowText = txt.slice(startIdx, endIdx);
-    if (nextMatch) datePattern.lastIndex = nextMatch.index; // rewind one step
 
-    // Look for week number before this date
+    // Detect week before this date
     const beforeDate = txt.slice(Math.max(0, startIdx - 20), startIdx);
     const weekMatch = beforeDate.match(/(?:v\.?|vecka)?\s*(\d{1,2})(?=\s*20\d{2}-\d{2}-\d{2})?/i);
     if (weekMatch) currentWeek = weekMatch[1];
 
-    // Match a row (allow optional fields)
     const rowMatch = rowText.match(
       /(20\d{2}-\d{2}-\d{2})\s+(\w+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s*([A-ZÅÄÖa-zåäö0-9\s]+?)?(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?(.*)$/i
     );
 
     if (rowMatch) {
-      const [, date, day, from, to, code, rast, tid, rest] = rowMatch;
+      const [, datum, dag, från, till, kod, rast, tid, rest] = rowMatch;
       rows.push({
         vecka: currentWeek,
-        datum: date,
-        dag: day,
-        från: fixTime(from || ""),
-        till: fixTime(to || ""),
-        kod: (code || "").trim(),
-        rast: rast || "",
-        tid: tid || "",
-        anteckningar: (rest || "").trim(),
+        datum: datum,
+        dag: dag,
+        från: fixTime(från || ''),
+        till: fixTime(till || ''),
+        kod: (kod || '').trim(),
+        rast: rast || '',
+        tid: tid || '',
+        anteckningar: (rest || '').trim()
       });
     }
   }
@@ -307,9 +295,9 @@ function parseTable(txt) {
 }
 
 function fixTime(s) {
-  return s ? s.replace(/[^0-9]/g, "").padStart(4, "0") : "";
+  return s ? s.replace(/[^0-9]/g, '').padStart(4, '0') : '';
 }
-  
+
 function displayTable(rows){
   preview.innerHTML = '';
   rows.forEach(row => {
@@ -328,8 +316,6 @@ function displayTable(rows){
     preview.appendChild(tr);
   });
 }
-
-function fixTime(s){ return s.padStart(4,'0'); }
 
 function buildIcs(events){
   const lines=[
@@ -356,11 +342,12 @@ function buildIcs(events){
     'END:STANDARD',
     'END:VTIMEZONE'
   ];
-  
+
+  function esc(s){return s.replace(/([,;])/g,'\\$1');}
+
   for(const e of events){
     const uid = e.datum.replace(/-/g,'') + e.från + e.till + Math.random().toString(36).slice(2,6) + '@pdf2ics';
-    const summary = e.anteckningar ? e.kod + ', ' + e.anteckningar : e.kod;
-    
+    const summary = esc(e.anteckningar ? e.kod + ', ' + e.anteckningar : e.kod);
     lines.push('BEGIN:VEVENT');
     lines.push('UID:' + uid);
     lines.push('DTSTAMP:' + new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z');
