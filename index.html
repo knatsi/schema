@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics v12</title>
+<title>Schema PDF → .ics v13</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -254,42 +254,51 @@ async function handleFile(file){
 }
 
 function parseTable(txt) {
+  // Normalize whitespace
   txt = txt.replace(/\s+/g, ' ').trim();
 
+  // Cut off everything before the main header
+  const headerIndex = txt.indexOf("Vecka Datum Dag Från Till Kod Rast Tid Anteckningar");
+  if (headerIndex === -1) return [];
+  txt = txt.slice(headerIndex + 50); // skip header
+
   const rows = [];
-  let currentWeek = '';
+  let currentWeek = "";
   const datePattern = /(20\d{2}-\d{2}-\d{2})/g;
   let match;
 
   while ((match = datePattern.exec(txt)) !== null) {
-    const date = match[1];
+    const datum = match[1];
     const startIdx = match.index;
-    const endIdx = (datePattern.lastIndex = txt.indexOf('20', startIdx + 1));
-    const nextIdx = endIdx > 0 ? endIdx : txt.length;
-    const rowText = txt.slice(startIdx, nextIdx);
 
-    // detect week before this date — e.g. “42 2025-10-13” or “Vecka 42”
+    // Peek ahead to next date or end
+    const nextMatch = datePattern.exec(txt);
+    const endIdx = nextMatch ? nextMatch.index : txt.length;
+    const rowText = txt.slice(startIdx, endIdx);
+    if (nextMatch) datePattern.lastIndex = nextMatch.index; // rewind one step
+
+    // Look for week number before this date
     const beforeDate = txt.slice(Math.max(0, startIdx - 20), startIdx);
     const weekMatch = beforeDate.match(/(?:v\.?|vecka)?\s*(\d{1,2})(?=\s*20\d{2}-\d{2}-\d{2})?/i);
     if (weekMatch) currentWeek = weekMatch[1];
 
-    // Match row contents (allows missing fields)
+    // Match a row (allow optional fields)
     const rowMatch = rowText.match(
       /(20\d{2}-\d{2}-\d{2})\s+(\w+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s*([A-ZÅÄÖa-zåäö0-9\s]+?)?(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?(.*)$/i
     );
 
     if (rowMatch) {
-      const [, datum, dag, från, till, kod, rast, tid, rest] = rowMatch;
+      const [, date, day, from, to, code, rast, tid, rest] = rowMatch;
       rows.push({
         vecka: currentWeek,
-        datum,
-        dag,
-        från: fixTime(från || ''),
-        till: fixTime(till || ''),
-        kod: (kod || '').trim(),
-        rast: rast || '',
-        tid: tid || '',
-        anteckningar: (rest || '').trim()
+        datum: date,
+        dag: day,
+        från: fixTime(from || ""),
+        till: fixTime(to || ""),
+        kod: (code || "").trim(),
+        rast: rast || "",
+        tid: tid || "",
+        anteckningar: (rest || "").trim(),
       });
     }
   }
@@ -298,8 +307,7 @@ function parseTable(txt) {
 }
 
 function fixTime(s) {
-  if (!s) return '';
-  return s.replace(/[^0-9]/g, '').padStart(4, '0');
+  return s ? s.replace(/[^0-9]/g, "").padStart(4, "0") : "";
 }
   
 function displayTable(rows){
