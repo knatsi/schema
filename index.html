@@ -36,11 +36,9 @@ pre {
 .note { color:#555; font-size:0.9rem; margin-top:6px; }
 </style>
 <!-- Load PDF.js core + worker manually -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.172/pdf.min.js"></script>
+<script src="pdfjs/pdf.min.js"></script>
 <script>
-  // Tell PDF.js where to find its worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.172/pdf.worker.min.js";
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "pdfjs/pdf.worker.min.js";
 </script>
 </head>
 <body>
