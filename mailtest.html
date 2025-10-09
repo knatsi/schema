@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mailtest</title>
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: #f5f1e8;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+.container {
+  background: white;
+  padding: 30px;
+  border-radius: 14px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  width: 350px;
+  text-align: center;
+}
+input, button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+button {
+  background: #6b8e23;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+button:hover { background: #7ba428; }
+#status {
+  margin-top: 15px;
+  font-size: 0.95rem;
+  color: #5a4a3a;
+}
+.success { color: #6b8e23; }
+.error { color: #c00; }
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>Testa e-post</h2>
+  <input id="emailTo" type="email" placeholder="Mottagarens e-post" />
+  <input id="subject" type="text" placeholder="Ämne" />
+  <button id="sendBtn">Skicka testmail</button>
+  <div id="status"></div>
+</div>
+
+<script>
+const sendBtn = document.getElementById("sendBtn");
+const emailTo = document.getElementById("emailTo");
+const subject = document.getElementById("subject");
+const status = document.getElementById("status");
+
+sendBtn.addEventListener("click", async () => {
+  const to = emailTo.value.trim();
+  const subj = subject.value.trim() || "Testmail från Render";
+  if (!to) {
+    status.textContent = "Ange en e-postadress.";
+    status.className = "error";
+    return;
+  }
+
+  status.textContent = "Skickar...";
+  status.className = "";
+
+  try {
+    const res = await fetch("https://smtp2go-relay.onrender.com/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject: subj, icsContent: "Testmessage" })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      status.textContent = "✅ E-post skickad!";
+      status.className = "success";
+    } else {
+      status.textContent = "❌ Misslyckades: " + (data.error || "Okänt fel");
+      status.className = "error";
+      console.log(data);
+    }
+  } catch (err) {
+    status.textContent = "❌ Fel vid skickning: " + err.message;
+    status.className = "error";
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>
