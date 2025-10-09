@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics ny dag1</title>
+<title>Schema PDF → .ics dag1.1</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -42,8 +42,6 @@ h2 {
   cursor: pointer;
   transition: all 0.3s ease;
   background: #faf8f3;
-  position: relative;
-  overflow: hidden;
 }
 .drop:hover {
   border-color: #8b7355;
@@ -161,7 +159,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "pdfjs/pdf.worker.min.js";
   <table id="preview">
     <thead>
       <tr>
-        <th>Vecka</th>
         <th>Datum</th>
         <th>Dag</th>
         <th>Från</th>
@@ -169,11 +166,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "pdfjs/pdf.worker.min.js";
         <th>Kod</th>
         <th>Rast</th>
         <th>Tid</th>
-        <th>Anteckningar</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td colspan="9" style="text-align:center;padding:20px;">Ingen fil laddad än...</td></tr>
+      <tr><td colspan="7" style="text-align:center;padding:20px;">Ingen fil laddad än...</td></tr>
     </tbody>
   </table>
 </div>
@@ -216,7 +212,7 @@ async function handleFile(file){
     if(parsedRows.length===0){
       status.textContent='Inga rader hittade. Kontrollera PDF-format.';
       status.className='note';
-      preview.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Ingen data hittades</td></tr>';
+      preview.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">Ingen data hittades</td></tr>';
       downloadBtn.disabled=true;
       return;
     }
@@ -224,7 +220,7 @@ async function handleFile(file){
     displayTable(parsedRows);
 
     const validEvents = parsedRows.filter(r => 
-    r.datum && /^\d{4}$/.test(r.från) && /^\d{4}$/.test(r.till) && r.kod
+      r.datum && /^\d{4}$/.test(r.från) && /^\d{4}$/.test(r.till) && r.kod
     );
     if(validEvents.length > 0) {
       lastIcs = buildIcs(validEvents);
@@ -244,11 +240,10 @@ async function handleFile(file){
   }
 }
 
-// ✅ FIXED PARSER
+// ✅ Improved parser (no vecka/anteckningar)
 function parseTable(txt) {
   txt = txt.replace(/\s+/g, ' ').trim();
 
-  // Start only after the main header
   const headerIndex = txt.indexOf("Vecka Datum Dag Från Till Kod Rast Tid Anteckningar");
   if (headerIndex === -1) return [];
   txt = txt.slice(headerIndex + 50);
@@ -265,42 +260,33 @@ function parseTable(txt) {
     const endIdx = i < allDates.length - 1 ? allDates[i + 1].index : txt.length;
     const rowText = txt.slice(startIdx, endIdx).trim();
 
-    // Detect week number just before this date
-    const beforeDate = txt.slice(Math.max(0, startIdx - 30), startIdx);
-    const weekMatch = beforeDate.match(/(?:v\.?|vecka)?\s*(\d{1,2})(?=\s*20\d{2}-\d{2}-\d{2})?/i);
-    if (weekMatch) currentWeek = weekMatch[1];
-
-    // Regex for line: date day from to KOD (all caps+spaces) rast tid notes
+    // Regex: date, day, from, to, KOD (all caps/spaces), rast, tid
     const rowMatch = rowText.match(
-      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?(.*)$/iu
+      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?/iu
     );
 
     if (rowMatch) {
-      const [, datum, dag, fran, till, kod, rast, tid, rest] = rowMatch;
+      const [, datum, dag, fran, till, kod, rast, tid] = rowMatch;
       rows.push({
-        vecka: currentWeek,
         datum,
         dag,
         från: fixTime(fran || ''),
         till: fixTime(till || ''),
         kod: (kod || '').trim(),
         rast: rast || '',
-        tid: tid || '',
-        anteckningar: (rest || '').trim()
+        tid: tid || ''
       });
     } else {
-      // fallback: at least preserve date
+      // fallback: date only
       const dateOnly = rowText.match(/(20\d{2}-\d{2}-\d{2})/);
       rows.push({
-        vecka: currentWeek,
         datum: dateOnly ? dateOnly[1] : '',
         dag: '',
         från: '',
         till: '',
         kod: '',
         rast: '',
-        tid: '',
-        anteckningar: rowText.trim()
+        tid: ''
       });
     }
   }
@@ -312,13 +298,11 @@ function fixTime(s) {
   return s ? s.replace(/[^0-9]/g, '').padStart(4, '0') : '';
 }
 
-
 function displayTable(rows){
   preview.innerHTML = '';
   rows.forEach(row => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${row.vecka}</td>
       <td>${row.datum}</td>
       <td>${row.dag}</td>
       <td>${row.från}</td>
@@ -326,7 +310,6 @@ function displayTable(rows){
       <td>${row.kod}</td>
       <td>${row.rast}</td>
       <td>${row.tid}</td>
-      <td>${row.anteckningar}</td>
     `;
     preview.appendChild(tr);
   });
@@ -358,11 +341,9 @@ function buildIcs(events){
     'END:VTIMEZONE'
   ];
 
-  function esc(s){return s.replace(/([,;])/g,'\\$1');}
-
   for(const e of events){
     const uid = e.datum.replace(/-/g,'') + e.från + e.till + Math.random().toString(36).slice(2,6) + '@pdf2ics';
-    const summary = esc(e.anteckningar ? e.kod + ', ' + e.anteckningar : e.kod);
+    const summary = e.kod;
     lines.push('BEGIN:VEVENT');
     lines.push('UID:' + uid);
     lines.push('DTSTAMP:' + new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z');
