@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics ny dag</title>
+<title>Schema PDF → .ics ny dag1</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -223,7 +223,9 @@ async function handleFile(file){
 
     displayTable(parsedRows);
 
-    const validEvents = parsedRows.filter(r => r.datum && r.från && r.till && r.kod);
+    const validEvents = parsedRows.filter(r => 
+    r.datum && /^\d{4}$/.test(r.från) && /^\d{4}$/.test(r.till) && r.kod
+    );
     if(validEvents.length > 0) {
       lastIcs = buildIcs(validEvents);
       downloadBtn.disabled=false;
@@ -261,16 +263,16 @@ function parseTable(txt) {
   for (let i = 0; i < allDates.length; i++) {
     const startIdx = allDates[i].index;
     const endIdx = i < allDates.length - 1 ? allDates[i + 1].index : txt.length;
-    const rowText = txt.slice(startIdx, endIdx);
+    const rowText = txt.slice(startIdx, endIdx).trim();
 
-    // detect week before this date
+    // Detect week number just before this date
     const beforeDate = txt.slice(Math.max(0, startIdx - 30), startIdx);
     const weekMatch = beforeDate.match(/(?:v\.?|vecka)?\s*(\d{1,2})(?=\s*20\d{2}-\d{2}-\d{2})?/i);
     if (weekMatch) currentWeek = weekMatch[1];
 
-    // Unicode-aware day capture (uses \p{L} with 'u' flag). Fallback to explicit class if needed.
+    // Regex for line: date day from to KOD (all caps+spaces) rast tid notes
     const rowMatch = rowText.match(
-      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s*([A-ZÅÄÖa-zåäö0-9\s]+?)?(?:\s+(\d{1,2}:\d{2}))?(?:\s+(\d{1,2}:\d{2}))?(.*)$/iu
+      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?(.*)$/iu
     );
 
     if (rowMatch) {
@@ -287,7 +289,7 @@ function parseTable(txt) {
         anteckningar: (rest || '').trim()
       });
     } else {
-      // graceful fallback to avoid crashes
+      // fallback: at least preserve date
       const dateOnly = rowText.match(/(20\d{2}-\d{2}-\d{2})/);
       rows.push({
         vecka: currentWeek,
@@ -309,6 +311,7 @@ function parseTable(txt) {
 function fixTime(s) {
   return s ? s.replace(/[^0-9]/g, '').padStart(4, '0') : '';
 }
+
 
 function displayTable(rows){
   preview.innerHTML = '';
