@@ -151,7 +151,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "pdfjs/pdf.worker.min.js";
   <input id="fileInput" type="file" accept="application/pdf" style="display:none" />
 </div>
 
-<button id="downloadBtn" disabled>📥 Hämta .ics</button>
+<div style="display:flex;gap:10px;flex-wrap:wrap;">
+  <button id="downloadBtn" disabled>📥 Hämta .ics</button>
+  <button id="mailBtn" disabled>✉️ Skicka e-post</button>
+</div>
 <div id="status" class="note"></div>
 
 <h3>Förhandsvisning av tolkat schema</h3>
