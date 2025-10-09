@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schema PDF → .ics trottis</title>
+<title>Schema PDF → .ics ny dag</title>
 <style>
 * { box-sizing: border-box; }
 body { 
@@ -254,39 +254,51 @@ function parseTable(txt) {
   const rows = [];
   let currentWeek = "";
   const datePattern = /(20\d{2}-\d{2}-\d{2})/g;
-  let match;
-
   const allDates = [];
-  while ((match = datePattern.exec(txt)) !== null) {
-    allDates.push({ date: match[1], index: match.index });
-  }
+  let m;
+  while ((m = datePattern.exec(txt)) !== null) allDates.push({ date: m[1], index: m.index });
 
   for (let i = 0; i < allDates.length; i++) {
     const startIdx = allDates[i].index;
     const endIdx = i < allDates.length - 1 ? allDates[i + 1].index : txt.length;
     const rowText = txt.slice(startIdx, endIdx);
 
-    // Detect week before this date
-    const beforeDate = txt.slice(Math.max(0, startIdx - 20), startIdx);
+    // detect week before this date
+    const beforeDate = txt.slice(Math.max(0, startIdx - 30), startIdx);
     const weekMatch = beforeDate.match(/(?:v\.?|vecka)?\s*(\d{1,2})(?=\s*20\d{2}-\d{2}-\d{2})?/i);
     if (weekMatch) currentWeek = weekMatch[1];
 
+    // Unicode-aware day capture (uses \p{L} with 'u' flag). Fallback to explicit class if needed.
     const rowMatch = rowText.match(
-      /(20\d{2}-\d{2}-\d{2})\s+(\w+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s*([A-ZÅÄÖa-zåäö0-9\s]+?)?(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?(.*)$/i
+      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s*([A-ZÅÄÖa-zåäö0-9\s]+?)?(?:\s+(\d{1,2}:\d{2}))?(?:\s+(\d{1,2}:\d{2}))?(.*)$/iu
     );
 
     if (rowMatch) {
-      const [, datum, dag, från, till, kod, rast, tid, rest] = rowMatch;
+      const [, datum, dag, fran, till, kod, rast, tid, rest] = rowMatch;
       rows.push({
         vecka: currentWeek,
-        datum: datum,
-        dag: dag,
-        från: fixTime(från || ''),
+        datum,
+        dag,
+        från: fixTime(fran || ''),
         till: fixTime(till || ''),
         kod: (kod || '').trim(),
         rast: rast || '',
         tid: tid || '',
         anteckningar: (rest || '').trim()
+      });
+    } else {
+      // graceful fallback to avoid crashes
+      const dateOnly = rowText.match(/(20\d{2}-\d{2}-\d{2})/);
+      rows.push({
+        vecka: currentWeek,
+        datum: dateOnly ? dateOnly[1] : '',
+        dag: '',
+        från: '',
+        till: '',
+        kod: '',
+        rast: '',
+        tid: '',
+        anteckningar: rowText.trim()
       });
     }
   }
