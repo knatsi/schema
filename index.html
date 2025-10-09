@@ -69,12 +69,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="pdfjs/pdf.worker.min.js";
     <input id="fileInput" type="file" accept="application/pdf" style="display:none" />
   </div>
 
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:15px;">
-  <button id="downloadBtn" disabled>📥 Hämta .ics</button>
-  <button id="mailBtn" disabled>✉️ Skicka e-post</button>
-</div>
-
-<input id="emailTo" type="email" placeholder="Din e-postadress..." style="margin-top:10px;padding:12px;width:100%;border-radius:10px;border:1px solid #ccc;font-size:1rem" />
+  <div class="btn-group">
+    <button id="downloadBtn" disabled>📥 Hämta .ics</button>
+    <button id="mailBtn" disabled>✉️ Öppna e-post</button>
+  </div>
 
   <div id="status" class="note"></div>
 
@@ -100,7 +98,7 @@ const downloadBtn=document.getElementById('downloadBtn');
 const mailBtn=document.getElementById('mailBtn');
 const preview=document.getElementById('preview').querySelector('tbody');
 const status=document.getElementById('status');
-let parsedRows=[],lastIcs='';
+let parsedRows=[],lastIcs='',lastFilename='schema.ics';
 
 drop.addEventListener('click',()=>fileInput.click());
 drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
@@ -131,6 +129,8 @@ async function handleFile(file){
     const validEvents=parsedRows.filter(r=>r.datum&&/^\d{4}$/.test(r.från)&&/^\d{4}$/.test(r.till)&&r.kod);
     if(validEvents.length>0){
       lastIcs=buildIcs(validEvents);
+      const today=new Date().toISOString().split('T')[0];
+      lastFilename=file.name.replace('.pdf','')+'_'+today+'.ics';
       downloadBtn.disabled=false;mailBtn.disabled=false;
       status.textContent=`✓ ${validEvents.length} arbetspass redo att exportera!`;
       status.className='note success';
@@ -146,7 +146,6 @@ async function handleFile(file){
   }
 }
 
-// ---- Parsing ----
 function parseTable(txt){
   txt=txt.replace(/\s+/g,' ').trim();
   const headerIndex=txt.indexOf("Vecka Datum Dag Från Till Kod Rast Tid Anteckningar");
@@ -168,9 +167,6 @@ function parseTable(txt){
         från:fixTime(fran||''),till:fixTime(till||''),
         kod:(kod||'').trim(),rast:rast||'',tid:tid||''
       });
-    }else{
-      const dOnly=rowText.match(/(20\d{2}-\d{2}-\d{2})/);
-      rows.push({datum:dOnly?dOnly[1]:'',dag:'',från:'',till:'',kod:'',rast:'',tid:''});
     }
   }
   return rows;
@@ -185,7 +181,6 @@ function displayTable(rows){
   });
 }
 
-// ---- ICS ----
 function buildIcs(events){
   const lines=[
     'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//pdf2ics//','CALSCALE:GREGORIAN','METHOD:PUBLISH',
@@ -211,32 +206,20 @@ function buildIcs(events){
   return lines.join('\r\n');
 }
 
-// ---- Buttons ----
 downloadBtn.addEventListener('click',()=>{
   const blob=new Blob([lastIcs],{type:'text/calendar;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;a.download='schema.ics';a.click();URL.revokeObjectURL(url);
+  a.href=url;a.download=lastFilename;a.click();
+  URL.revokeObjectURL(url);
 });
 
-mailBtn.addEventListener('click',async()=>{
-  const email=document.getElementById('emailTo').value.trim();
-  if(!email){alert('Ange e-postadress.');return;}
-  status.textContent='Skickar e-post...';status.className='note';
-  try{
-    const response=await fetch('https://smtp2go-relay.onrender.com/send-email',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({to:email,subject:'Arbetsschema .ics',icsContent:lastIcs})
-    });
-    const result=await response.json();
-    if(result.success){
-      status.textContent='✅ E-post skickad!';status.className='note success';
-    }else throw new Error(result.error||'Okänt fel');
-  }catch(err){
-    console.error(err);
-    status.textContent='❌ Fel vid skickning: '+err.message;status.className='note';
-  }
+mailBtn.addEventListener('click',()=>{
+  const subject=encodeURIComponent('Arbetsschema');
+  const body=encodeURIComponent('Hej!\n\nBifoga den nedladdade '+lastFilename+'-filen i detta e-postmeddelande.\n\nMvh');
+  window.location.href=`mailto:?subject=${subject}&body=${body}`;
+  status.textContent='📧 E-postklient öppnad. Glöm inte att bifoga .ics-filen!';
+  status.className='note';
 });
 </script>
 </body>
