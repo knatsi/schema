@@ -74,7 +74,7 @@ sendBtn.addEventListener("click", async () => {
   status.className = "";
 
   try {
-    const res = await fetch("https://knatsi.synology.me/send-email", {
+    const res = await fetch("https://knatsi.synology.me:3000/send-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to, subject: subj, icsContent: "Testmessage" })
