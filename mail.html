@@ -39,7 +39,7 @@ button:disabled{background:#c9b99a;cursor:not-allowed;box-shadow:none;padding:14
   border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(107,142,35,.3);
   transition:.3s;
 }
-.mail-btn-container:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,142,35,.4)}
+.mail-btn-container:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,142,35,.4)}
 .mail-btn-container input[type=email]{
   flex:1;padding:14px 16px;border:none;
   font-size:1rem;min-width:250px;background:#faf8f3;
@@ -85,7 +85,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
 
   <div class="btn-group">
     <button id="downloadBtn" disabled>Ladda ner</button>
-    <div class="mail-btn-container" id="mailBtnContainer">
+    <div class="mail-btn-container disabled" id="mailBtnContainer">
       <input type="email" id="emailInput" placeholder="Din e-postadress" disabled />
       <button id="sendBtn" disabled>Skicka</button>
     </div>
@@ -165,7 +165,6 @@ async function handleFile(file){
       downloadBtn.disabled=true;
       emailInput.disabled=true;
       sendBtn.disabled=true;
-      mailBtnContainer.classList.add('disabled');
     }
   }catch(err){
     console.error('PDF error:',err);
