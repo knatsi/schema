@@ -242,6 +242,7 @@ downloadBtn.addEventListener('click',()=>{
 });
 
 sendBtn.addEventListener('click', async () => {
+  
   const email = emailInput.value.trim();
   
   if(!email){
@@ -293,6 +294,11 @@ sendBtn.addEventListener('click', async () => {
       sendBtn.disabled = false;
       emailInput.disabled = false;
     }, 2000);
+  }
+});
+emailInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    sendBtn.click();
   }
 });
 </script>
