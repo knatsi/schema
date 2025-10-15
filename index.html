@@ -34,10 +34,24 @@ button{
 }
 button:hover:not(:disabled){transform:translateY(-2px);background:#5a4a3a;box-shadow:0 6px 20px rgba(107,142,35,.4)}
 button:disabled{background:#c9b99a;cursor:not-allowed;box-shadow:none;padding:14px 32px;}
-input[type=email]{
-  margin-top:15px;padding:12px;width:100%;
-  border-radius:10px;border:1px solid #ccc;font-size:1rem
+.mail-btn-container{
+  display:inline-flex;align-items:stretch;gap:0;margin-top:10px;
+  border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(107,142,35,.3);
+  transition:.3s;
 }
+.mail-btn-container:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,142,35,.4)}
+.mail-btn-container input[type=email]{
+  flex:1;padding:14px 16px;border:none;
+  font-size:1rem;min-width:250px;background:#faf8f3;
+  color:#5a4a3a;outline:none;
+}
+.mail-btn-container input[type=email]::placeholder{color:#8b7355;opacity:0.7;}
+.mail-btn-container button{
+  margin:0;border-radius:0;padding:14px 28px;
+  box-shadow:none;
+}
+.mail-btn-container button:hover:not(:disabled){transform:none;}
+.mail-btn-container.disabled{opacity:0.6;pointer-events:none;}
 h3{margin:30px 0 15px 0;color:#5a4a3a;font-size:1.3rem}
 table{
   width:100%;border-collapse:collapse;font-size:.85rem;
@@ -52,16 +66,16 @@ tr:hover{background:#f5f1e8}
 .success{color:#6b8e23;background:#f0f4e8;border:1px solid #d4e4c0}
 </style>
 
-<script src="pdfjs/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc="pdfjs/pdf.worker.min.js";
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
 </script>
 </head>
 
 <body>
 <div class="container">
   <h2>Konvertera ditt arbetsschema till kalenderfil</h2>
-  <div class="subtitle">Timecare .pdf-schemafil till .ics-kalenderfil. Ladda ner filen och skicka den sen till din telefonmail eller var du vill skapa din kalender.</div>
+  <div class="subtitle">Timecare .pdf-schemafil till .ics-kalenderfil. Ladda ner filen eller skicka den till din telefonmail och lägg in den i din kalender.</div>
 
   <div id="drop" class="drop">
     <div class="drop-icon">📄</div>
@@ -70,8 +84,11 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="pdfjs/pdf.worker.min.js";
   </div>
 
   <div class="btn-group">
-    <button id="downloadBtn" disabled>📥 Hämta .ics</button>
-    <button id="mailBtn" disabled>✉️ Öppna e-post</button>
+    <button id="downloadBtn" disabled>Ladda ner</button>
+    <div class="mail-btn-container disabled" id="mailBtnContainer">
+      <input type="email" id="emailInput" placeholder="Din e-postadress" disabled />
+      <button id="sendBtn" disabled>Skicka</button>
+    </div>
   </div>
 
   <div id="status" class="note"></div>
@@ -98,7 +115,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="pdfjs/pdf.worker.min.js";
 const drop=document.getElementById('drop');
 const fileInput=document.getElementById('fileInput');
 const downloadBtn=document.getElementById('downloadBtn');
-const mailBtn=document.getElementById('mailBtn');
+const mailBtnContainer=document.getElementById('mailBtnContainer');
+const emailInput=document.getElementById('emailInput');
+const sendBtn=document.getElementById('sendBtn');
 const preview=document.getElementById('preview').querySelector('tbody');
 const status=document.getElementById('status');
 let parsedRows=[],lastIcs='',lastFilename='schema.ics';
@@ -134,13 +153,18 @@ async function handleFile(file){
       lastIcs=buildIcs(validEvents);
       const today=new Date().toISOString().split('T')[0];
       lastFilename=file.name.replace('.pdf','')+'_'+today+'.ics';
-      downloadBtn.disabled=false;mailBtn.disabled=false;
+      downloadBtn.disabled=false;
+      emailInput.disabled=false;
+      sendBtn.disabled=false;
+      mailBtnContainer.classList.remove('disabled');
       status.textContent=`✓ ${validEvents.length} arbetspass redo att exportera!`;
       status.className='note success';
     }else{
       status.textContent=`Tabellen tolkad (${parsedRows.length} rader) men inga giltiga arbetspass hittade`;
       status.className='note';
-      downloadBtn.disabled=true;mailBtn.disabled=true;
+      downloadBtn.disabled=true;
+      emailInput.disabled=true;
+      sendBtn.disabled=true;
     }
   }catch(err){
     console.error('PDF error:',err);
@@ -217,12 +241,65 @@ downloadBtn.addEventListener('click',()=>{
   URL.revokeObjectURL(url);
 });
 
-mailBtn.addEventListener('click',()=>{
-  const subject=encodeURIComponent('Arbetsschema');
-  const body=encodeURIComponent('Hej!\n\nBifoga den nedladdade '+lastFilename+'-filen i detta e-postmeddelande.\n\nMvh');
-  window.location.href=`mailto:?subject=${subject}&body=${body}`;
-  status.textContent='📧 E-postklient öppnad. Glöm inte att bifoga .ics-filen!';
-  status.className='note';
+sendBtn.addEventListener('click', async () => {
+  
+  const email = emailInput.value.trim();
+  
+  if(!email){
+    status.textContent='⚠️ Ange en e-postadress';
+    status.className='note';
+    emailInput.focus();
+    return;
+  }
+  
+  if(!email.includes('@')||!email.includes('.')){
+    status.textContent='⚠️ Ange en giltig e-postadress';
+    status.className='note';
+    emailInput.focus();
+    return;
+  }
+  
+  try {
+    sendBtn.disabled = true;
+    emailInput.disabled = true;
+    status.textContent = '📧 Skickar e-post...';
+    status.className = 'note';
+    
+    const subject = 'Arbetsschema';
+    
+    const res = await fetch("https://knatsi.synology.me/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        to: email,
+        subject: subject, 
+        icsContent: lastIcs
+      })
+    });
+    
+    if (res.ok) {
+      status.textContent = '✅ E-post skickad till ' + email;
+      status.className = 'note success';
+      emailInput.value = '';
+    } else {
+      const errorData = await res.json().catch(()=>({}));
+      throw new Error(errorData.message || 'Failed to send email');
+    }
+  } catch (error) {
+    status.textContent = '❌ Kunde inte skicka e-post. Försök igen.';
+    status.className = 'note';
+    console.error('Email error:', error);
+  } finally {
+    setTimeout(() => {
+      sendBtn.disabled = false;
+      emailInput.disabled = false;
+    }, 2000);
+  }
+});
+emailInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    sendBtn.click();
+  }
 });
 </script>
 </body>
