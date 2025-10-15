@@ -39,7 +39,7 @@ button:disabled{background:#c9b99a;cursor:not-allowed;box-shadow:none;padding:14
   border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(107,142,35,.3);
   transition:.3s;
 }
-.mail-btn-container:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,142,35,.4)}
+.mail-btn-container:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,142,35,.4)}
 .mail-btn-container input[type=email]{
   flex:1;padding:14px 16px;border:none;
   font-size:1rem;min-width:250px;background:#faf8f3;
