@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Konvertera ditt arbetsschema till kalenderfil</title>
+<style>
+*{box-sizing:border-box}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  margin:0;padding:20px;min-height:100vh;
+  background:#f5f1e8;display:flex;justify-content:center;align-items:center
+}
+.container{
+  background:#fff;border-radius:20px;padding:40px;
+  max-width:900px;width:100%;
+  box-shadow:0 8px 30px rgba(101,84,68,.15)
+}
+h2{margin:0 0 10px 0;font-size:1.8rem;color:#5a4a3a}
+.subtitle{color:#8b7355;font-size:.95rem;margin-bottom:30px}
+.drop{
+  border:3px dashed #c9b99a;border-radius:16px;
+  padding:50px 30px;text-align:center;cursor:pointer;
+  transition:.3s;background:#faf8f3
+}
+.drop:hover{border-color:#8b7355;background:#f5f1e8;transform:translateY(-2px)}
+.drop.drag{border-color:#8b7355;background:#f0f4e8;transform:scale(1.02)}
+.drop-icon{font-size:3rem;margin-bottom:10px}
+.drop-text{color:#5a4a3a;font-size:1.1rem;font-weight:500}
+button{
+  padding:14px 32px;border:none;border-radius:12px;margin-top:10px;
+  background:#8b7355;color:#fff;font-size:1rem;font-weight:600;
+  cursor:pointer;transition:.3s;box-shadow:0 4px 15px rgba(107,142,35,.3)
+}
+button:hover:not(:disabled){transform:translateY(-2px);background:#5a4a3a;box-shadow:0 6px 20px rgba(107,142,35,.4)}
+button:disabled{background:#c9b99a;cursor:not-allowed;box-shadow:none;padding:14px 32px;}
+.email-dialog{
+  display:none;margin-top:15px;padding:20px;
+  background:#faf8f3;border-radius:12px;border:1px solid #c9b99a;
+  animation:slideDown 0.3s ease-out;
+}
+.email-dialog.show{display:block;}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.email-input-group{display:flex;gap:8px;align-items:center;}
+.email-input-group input[type=email]{
+  flex:1;padding:12px;border-radius:10px;border:1px solid #c9b99a;
+  font-size:1rem;margin:0;
+}
+.send-arrow{
+  width:44px;height:44px;border:none;border-radius:50%;
+  background:#6b8e23;color:#fff;font-size:1.3rem;
+  cursor:pointer;transition:.3s;display:flex;align-items:center;
+  justify-content:center;box-shadow:0 2px 8px rgba(107,142,35,.3);
+}
+.send-arrow:hover:not(:disabled){transform:scale(1.1);background:#5a4a3a;box-shadow:0 4px 12px rgba(107,142,35,.4)}
+.send-arrow:disabled{background:#c9b99a;cursor:not-allowed;}
+h3{margin:30px 0 15px 0;color:#5a4a3a;font-size:1.3rem}
+table{
+  width:100%;border-collapse:collapse;font-size:.85rem;
+  background:#faf8f3;border-radius:12px;overflow:hidden
+}
+th{background:#5a4a3a;color:#fff;padding:10px 8px;text-align:left;font-weight:600}
+td{padding:8px;border-bottom:1px solid #e8e0d5;color:#5a4a3a}
+tr:last-child td{border-bottom:none}
+tr:hover{background:#f5f1e8}
+.table-wrapper{max-height:400px;overflow:auto;border-radius:12px;border:1px solid #e8e0d5}
+.note{color:#8b7355;font-size:.95rem;margin-top:12px;padding:10px;border-radius:8px;background:#faf8f3}
+.success{color:#6b8e23;background:#f0f4e8;border:1px solid #d4e4c0}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+</script>
+</head>
+
+<body>
+<div class="container">
+  <h2>Konvertera ditt arbetsschema till kalenderfil</h2>
+  <div class="subtitle">Timecare .pdf-schemafil till .ics-kalenderfil. Ladda ner filen och skicka den sen till din telefonmail eller var du vill skapa din kalender.</div>
+
+  <div id="drop" class="drop">
+    <div class="drop-icon">📄</div>
+    <div class="drop-text">Dra PDF hit eller klicka för att välja fil</div>
+    <input id="fileInput" type="file" accept="application/pdf" style="display:none" />
+  </div>
+
+  <div class="btn-group">
+    <button id="downloadBtn" disabled>📥 Hämta .ics</button>
+    <button id="mailBtn" disabled>✉️ Skicka via e-post</button>
+  </div>
+
+  <div id="emailDialog" class="email-dialog">
+    <div class="email-input-group">
+      <input type="email" id="emailInput" placeholder="Din e-postadress" />
+      <button class="send-arrow" id="sendBtn" title="Skicka">➤</button>
+    </div>
+  </div>
+
+  <div id="status" class="note"></div>
+
+  <h3>Förhandsvisning av tolkat schema</h3>
+  <div class="table-wrapper">
+    <table id="preview">
+      <thead>
+        <tr>
+          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Rast</th><th>Tid</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="7" style="text-align:center;padding:20px;">Ingen fil laddad än...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="disclamer" class="note">Observera att jag inte tar något som helst ansvar över denna omvandlare eller annat! <br> Är det så att den inte funkar så skicka ett mail till mig, gärna med bifogad pdf. /Daniel</div>
+</div>
+
+
+
+<script>
+const drop=document.getElementById('drop');
+const fileInput=document.getElementById('fileInput');
+const downloadBtn=document.getElementById('downloadBtn');
+const mailBtn=document.getElementById('mailBtn');
+const emailDialog=document.getElementById('emailDialog');
+const emailInput=document.getElementById('emailInput');
+const sendBtn=document.getElementById('sendBtn');
+const preview=document.getElementById('preview').querySelector('tbody');
+const status=document.getElementById('status');
+let parsedRows=[],lastIcs='',lastFilename='schema.ics';
+
+drop.addEventListener('click',()=>fileInput.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');handleFile(e.dataTransfer.files[0])});
+fileInput.addEventListener('change',e=>handleFile(e.target.files[0]));
+
+async function handleFile(file){
+  if(!file)return;
+  if(!file.name.toLowerCase().endsWith('.pdf')){alert('Välj en PDF-fil.');return;}
+  status.textContent='Läser PDF...';status.className='note';
+  try{
+    const arrayBuffer=await file.arrayBuffer();
+    const doc=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+    let text='';
+    for(let i=1;i<=doc.numPages;i++){
+      const page=await doc.getPage(i);
+      const content=await page.getTextContent();
+      text+=' '+content.items.map(it=>it.str).join(' ');
+    }
+    parsedRows=parseTable(text);
+    if(parsedRows.length===0){
+      status.textContent='Inga rader hittade. Kontrollera PDF-format.';
+      preview.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;">Ingen data hittades</td></tr>';
+      downloadBtn.disabled=true;mailBtn.disabled=true;return;
+    }
+    displayTable(parsedRows);
+    const validEvents=parsedRows.filter(r=>r.datum&&/^\d{4}$/.test(r.från)&&/^\d{4}$/.test(r.till)&&r.kod);
+    if(validEvents.length>0){
+      lastIcs=buildIcs(validEvents);
+      const today=new Date().toISOString().split('T')[0];
+      lastFilename=file.name.replace('.pdf','')+'_'+today+'.ics';
+      downloadBtn.disabled=false;mailBtn.disabled=false;
+      status.textContent=`✓ ${validEvents.length} arbetspass redo att exportera!`;
+      status.className='note success';
+    }else{
+      status.textContent=`Tabellen tolkad (${parsedRows.length} rader) men inga giltiga arbetspass hittade`;
+      status.className='note';
+      downloadBtn.disabled=true;mailBtn.disabled=true;
+    }
+  }catch(err){
+    console.error('PDF error:',err);
+    status.textContent='Fel vid läsning av PDF: '+(err.message||err);
+    status.className='note';
+  }
+}
+
+function parseTable(txt){
+  txt=txt.replace(/\s+/g,' ').trim();
+  const headerIndex=txt.indexOf("Vecka Datum Dag Från Till Kod Rast Tid Anteckningar");
+  if(headerIndex===-1)return[];
+  txt=txt.slice(headerIndex+50);
+  const rows=[],datePattern=/(20\d{2}-\d{2}-\d{2})/g;
+  const allDates=[];let m;while((m=datePattern.exec(txt))!==null)allDates.push({date:m[1],index:m.index});
+  for(let i=0;i<allDates.length;i++){
+    const startIdx=allDates[i].index;
+    const endIdx=i<allDates.length-1?allDates[i+1].index:txt.length;
+    const rowText=txt.slice(startIdx,endIdx).trim();
+    const rowMatch=rowText.match(
+      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?/iu
+    );
+    if(rowMatch){
+      const[,datum,dag,fran,till,kod,rast,tid]=rowMatch;
+      rows.push({
+        datum,dag,
+        från:fixTime(fran||''),till:fixTime(till||''),
+        kod:(kod||'').trim(),rast:rast||'',tid:tid||''
+      });
+    }
+  }
+  return rows;
+}
+function fixTime(s){return s?s.replace(/[^0-9]/g,'').padStart(4,'0'):'';}
+function displayTable(rows){
+  preview.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.datum}</td><td>${r.dag}</td><td>${r.från}</td><td>${r.till}</td><td>${r.kod}</td><td>${r.rast}</td><td>${r.tid}</td>`;
+    preview.appendChild(tr);
+  });
+}
+
+function buildIcs(events){
+  const lines=[
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//pdf2ics//','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+    'X-WR-CALNAME:Arbetsschema','X-WR-TIMEZONE:Europe/Stockholm',
+    'BEGIN:VTIMEZONE','TZID:Europe/Stockholm','BEGIN:DAYLIGHT',
+    'TZOFFSETFROM:+0100','TZOFFSETTO:+0200','DTSTART:19700329T020000',
+    'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU','END:DAYLIGHT',
+    'BEGIN:STANDARD','TZOFFSETFROM:+0200','TZOFFSETTO:+0100','DTSTART:19701025T030000',
+    'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU','END:STANDARD','END:VTIMEZONE'
+  ];
+  for(const e of events){
+    const uid=e.datum.replace(/-/g,'')+e.från+e.till+Math.random().toString(36).slice(2,6)+'@pdf2ics';
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:'+uid);
+    lines.push('DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z');
+    lines.push('DTSTART;TZID=Europe/Stockholm:'+e.datum.replace(/-/g,'')+'T'+e.från+'00');
+    lines.push('DTEND;TZID=Europe/Stockholm:'+e.datum.replace(/-/g,'')+'T'+e.till+'00');
+    lines.push('SUMMARY:'+e.kod);
+    lines.push('STATUS:CONFIRMED');
+    lines.push('END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+downloadBtn.addEventListener('click',()=>{
+  const blob=new Blob([lastIcs],{type:'text/calendar;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=lastFilename;a.click();
+  URL.revokeObjectURL(url);
+});
+
+mailBtn.addEventListener('click',()=>{
+  emailDialog.classList.toggle('show');
+  if(emailDialog.classList.contains('show')){
+    emailInput.focus();
+  }
+});
+
+sendBtn.addEventListener('click', async () => {
+  const email = emailInput.value.trim();
+  
+  if(!email){
+    status.textContent='⚠️ Ange en e-postadress';
+    status.className='note';
+    return;
+  }
+  
+  if(!email.includes('@')||!email.includes('.')){
+    status.textContent='⚠️ Ange en giltig e-postadress';
+    status.className='note';
+    return;
+  }
+  
+  try {
+    sendBtn.disabled = true;
+    mailBtn.disabled = true;
+    status.textContent = '📧 Skickar e-post...';
+    status.className = 'note';
+    
+    const subject = 'Arbetsschema';
+    
+    const res = await fetch("https://knatsi.synology.me/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        to: email,
+        subject: subject, 
+        icsContent: lastIcs
+      })
+    });
+    
+    if (res.ok) {
+      status.textContent = '✅ E-post skickad till ' + email;
+      status.className = 'note success';
+      emailDialog.classList.remove('show');
+      emailInput.value = '';
+    } else {
+      const errorData = await res.json().catch(()=>({}));
+      throw new Error(errorData.message || 'Failed to send email');
+    }
+  } catch (error) {
+    status.textContent = '❌ Kunde inte skicka e-post. Försök igen.';
+    status.className = 'note';
+    console.error('Email error:', error);
+  } finally {
+    setTimeout(() => {
+      sendBtn.disabled = false;
+      mailBtn.disabled = false;
+    }, 2000);
+  }
+});
+</script>
+</body>
+</html>
