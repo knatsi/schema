@@ -34,26 +34,24 @@ button{
 }
 button:hover:not(:disabled){transform:translateY(-2px);background:#5a4a3a;box-shadow:0 6px 20px rgba(107,142,35,.4)}
 button:disabled{background:#c9b99a;cursor:not-allowed;box-shadow:none;padding:14px 32px;}
-.email-dialog{
-  display:none;margin-top:15px;padding:20px;
-  background:#faf8f3;border-radius:12px;border:1px solid #c9b99a;
-  animation:slideDown 0.3s ease-out;
+.mail-btn-container{
+  display:inline-flex;align-items:stretch;gap:0;margin-top:10px;
+  border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(107,142,35,.3);
+  transition:.3s;
 }
-.email-dialog.show{display:block;}
-@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-.email-input-group{display:flex;gap:8px;align-items:center;}
-.email-input-group input[type=email]{
-  flex:1;padding:12px;border-radius:10px;border:1px solid #c9b99a;
-  font-size:1rem;margin:0;
+.mail-btn-container:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,142,35,.4)}
+.mail-btn-container input[type=email]{
+  flex:1;padding:14px 16px;border:none;
+  font-size:1rem;min-width:250px;background:#faf8f3;
+  color:#5a4a3a;outline:none;
 }
-.send-arrow{
-  width:44px;height:44px;border:none;border-radius:50%;
-  background:#6b8e23;color:#fff;font-size:1.3rem;
-  cursor:pointer;transition:.3s;display:flex;align-items:center;
-  justify-content:center;box-shadow:0 2px 8px rgba(107,142,35,.3);
+.mail-btn-container input[type=email]::placeholder{color:#8b7355;opacity:0.7;}
+.mail-btn-container button{
+  margin:0;border-radius:0;padding:14px 28px;
+  box-shadow:none;
 }
-.send-arrow:hover:not(:disabled){transform:scale(1.1);background:#5a4a3a;box-shadow:0 4px 12px rgba(107,142,35,.4)}
-.send-arrow:disabled{background:#c9b99a;cursor:not-allowed;}
+.mail-btn-container button:hover:not(:disabled){transform:none;}
+.mail-btn-container.disabled{opacity:0.6;pointer-events:none;}
 h3{margin:30px 0 15px 0;color:#5a4a3a;font-size:1.3rem}
 table{
   width:100%;border-collapse:collapse;font-size:.85rem;
@@ -86,14 +84,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
   </div>
 
   <div class="btn-group">
-    <button id="downloadBtn" disabled>📥 Hämta .ics</button>
-    <button id="mailBtn" disabled>✉️ Skicka via e-post</button>
-  </div>
-
-  <div id="emailDialog" class="email-dialog">
-    <div class="email-input-group">
-      <input type="email" id="emailInput" placeholder="Din e-postadress" />
-      <button class="send-arrow" id="sendBtn" title="Skicka">➤</button>
+    <button id="downloadBtn" disabled>Ladda ner kalenderfil</button>
+    <div class="mail-btn-container" id="mailBtnContainer">
+      <input type="email" id="emailInput" placeholder="Din e-postadress" disabled />
+      <button id="sendBtn" disabled>Skicka</button>
     </div>
   </div>
 
@@ -121,8 +115,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
 const drop=document.getElementById('drop');
 const fileInput=document.getElementById('fileInput');
 const downloadBtn=document.getElementById('downloadBtn');
-const mailBtn=document.getElementById('mailBtn');
-const emailDialog=document.getElementById('emailDialog');
+const mailBtnContainer=document.getElementById('mailBtnContainer');
 const emailInput=document.getElementById('emailInput');
 const sendBtn=document.getElementById('sendBtn');
 const preview=document.getElementById('preview').querySelector('tbody');
@@ -160,13 +153,19 @@ async function handleFile(file){
       lastIcs=buildIcs(validEvents);
       const today=new Date().toISOString().split('T')[0];
       lastFilename=file.name.replace('.pdf','')+'_'+today+'.ics';
-      downloadBtn.disabled=false;mailBtn.disabled=false;
+      downloadBtn.disabled=false;
+      emailInput.disabled=false;
+      sendBtn.disabled=false;
+      mailBtnContainer.classList.remove('disabled');
       status.textContent=`✓ ${validEvents.length} arbetspass redo att exportera!`;
       status.className='note success';
     }else{
       status.textContent=`Tabellen tolkad (${parsedRows.length} rader) men inga giltiga arbetspass hittade`;
       status.className='note';
-      downloadBtn.disabled=true;mailBtn.disabled=true;
+      downloadBtn.disabled=true;
+      emailInput.disabled=true;
+      sendBtn.disabled=true;
+      mailBtnContainer.classList.add('disabled');
     }
   }catch(err){
     console.error('PDF error:',err);
@@ -243,31 +242,26 @@ downloadBtn.addEventListener('click',()=>{
   URL.revokeObjectURL(url);
 });
 
-mailBtn.addEventListener('click',()=>{
-  emailDialog.classList.toggle('show');
-  if(emailDialog.classList.contains('show')){
-    emailInput.focus();
-  }
-});
-
 sendBtn.addEventListener('click', async () => {
   const email = emailInput.value.trim();
   
   if(!email){
     status.textContent='⚠️ Ange en e-postadress';
     status.className='note';
+    emailInput.focus();
     return;
   }
   
   if(!email.includes('@')||!email.includes('.')){
     status.textContent='⚠️ Ange en giltig e-postadress';
     status.className='note';
+    emailInput.focus();
     return;
   }
   
   try {
     sendBtn.disabled = true;
-    mailBtn.disabled = true;
+    emailInput.disabled = true;
     status.textContent = '📧 Skickar e-post...';
     status.className = 'note';
     
@@ -286,7 +280,6 @@ sendBtn.addEventListener('click', async () => {
     if (res.ok) {
       status.textContent = '✅ E-post skickad till ' + email;
       status.className = 'note success';
-      emailDialog.classList.remove('show');
       emailInput.value = '';
     } else {
       const errorData = await res.json().catch(()=>({}));
@@ -299,7 +292,7 @@ sendBtn.addEventListener('click', async () => {
   } finally {
     setTimeout(() => {
       sendBtn.disabled = false;
-      mailBtn.disabled = false;
+      emailInput.disabled = false;
     }, 2000);
   }
 });
