@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Konvertera ditt arbetsschema till kalenderfil</title>
+<title>Konvertera ditt arbetsschema till kalenderfil b2</title>
 <style>
 *{box-sizing:border-box}
 body{
@@ -98,7 +98,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
     <table id="preview">
       <thead>
         <tr>
-          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Rast</th><th>Tid</th>
+          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Rast</th><th>Tid</th><th>Anteckningar</th>
         </tr>
       </thead>
       <tbody>
@@ -185,14 +185,18 @@ function parseTable(txt){
     const endIdx=i<allDates.length-1?allDates[i+1].index:txt.length;
     const rowText=txt.slice(startIdx,endIdx).trim();
     const rowMatch=rowText.match(
-      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?/iu
+      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?(?:\s+(.+))?/iu
     );
     if(rowMatch){
-      const[,datum,dag,fran,till,kod,rast,tid]=rowMatch;
+      const[,datum,dag,fran,till,kod,rast,tid,anteckningar]=rowMatch;
       rows.push({
         datum,dag,
-        från:fixTime(fran||''),till:fixTime(till||''),
-        kod:(kod||'').trim(),rast:rast||'',tid:tid||''
+        från:fixTime(fran||''),
+        till:fixTime(till||''),
+        kod:(kod||'').trim(),
+        rast:rast||'',
+        tid:tid||'',
+        anteckningar: (anteckningar || '').trim()
       });
     }
   }
@@ -203,7 +207,7 @@ function displayTable(rows){
   preview.innerHTML='';
   rows.forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${r.datum}</td><td>${r.dag}</td><td>${r.från}</td><td>${r.till}</td><td>${r.kod}</td><td>${r.rast}</td><td>${r.tid}</td>`;
+    tr.innerHTML=`<td>${r.datum}</td><td>${r.dag}</td><td>${r.från}</td><td>${r.till}</td><td>${r.kod}</td><td>${r.rast}</td><td>${r.tid}</td><td>${r.anteckningar || ''}</td>`;
     preview.appendChild(tr);
   });
 }
