@@ -109,7 +109,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
     <table id="preview">
       <thead>
         <tr>
-          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Rast</th><th>Tid</th><th>Anteckningar</th><th></th>
+          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Anteckningar</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -225,8 +225,6 @@ function displayTable(rows){
       <td>${r.från}</td>
       <td>${r.till}</td>
       <td>${r.kod}</td>
-      <td>${r.rast}</td>
-      <td>${r.tid}</td>
       <td class="editable" data-index="${idx}">${r.anteckningar || ''}</td>
       <td class="delete-icon" data-index="${idx}" title="Ta bort rad">🗑️</td>
     `;
