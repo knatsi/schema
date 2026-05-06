@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Konvertera ditt arbetsschema till kalenderfil</title>
+<title>Konvertera ditt arbetsschema till kalenderfil. Beta</title>
 <style>
 *{box-sizing:border-box}
 body{
   font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
   margin:0;padding:20px;min-height:100vh;
-  background:#f5f1e8;display:flex;justify-content:center;align-items:center
+  background:#f5f5f5;display:flex;justify-content:center;align-items:center
 }
 .container{
   background:#fff;border-radius:20px;padding:40px;
@@ -51,36 +51,51 @@ button:disabled{background:#c9b99a;cursor:not-allowed;box-shadow:none;padding:14
   box-shadow:none;
 }
 .mail-btn-container button:hover:not(:disabled){transform:none;}
-.mail-btn-container.disabled{opacity:0.6;pointer-events:none;}
+.mail-btn-container.disabled{opacity:1;pointer-events:none;}
 h3{margin:30px 0 15px 0;color:#5a4a3a;font-size:1.3rem}
 table{
   width:100%;border-collapse:collapse;font-size:.85rem;
   background:#faf8f3;border-radius:12px;overflow:hidden
 }
+th,td{width:auto;}
+th:nth-child(1),td:nth-child(1){width:100px;}
+th:nth-child(2),td:nth-child(2){width:60px;}
+th:nth-child(3),td:nth-child(3){width:70px;}
+th:nth-child(4),td:nth-child(4){width:70px;}
+th:nth-child(5),td:nth-child(5){width:60px;}
+th:nth-child(6),td:nth-child(6){width:auto;}
+th:nth-child(7),td:nth-child(7){width:40px;text-align:center;}
 th{background:#5a4a3a;color:#fff;padding:10px 8px;text-align:left;font-weight:600}
 td{padding:8px;border-bottom:1px solid #e8e0d5;color:#5a4a3a}
 tr:last-child td{border-bottom:none}
 tr:hover{background:#f5f1e8}
+.editable{cursor:text;position:relative}
+.editable:hover{background:#f5f1e8;outline:1px dashed #c9b99a}
+.edit-input{
+  width:100%;padding:6px;border:2px solid #8b7355;border-radius:4px;
+  font-size:.85rem;font-family:inherit;background:#fff
+}
+.delete-icon{
+  cursor:pointer;font-size:1.2rem;color:#c85a54;
+  transition:.2s;text-align:center;
+}
+.delete-icon:hover{transform:scale(1.2);color:#a03a34}
 .table-wrapper{max-height:400px;overflow:auto;border-radius:12px;border:1px solid #e8e0d5}
 .note{color:#8b7355;font-size:.95rem;margin-top:12px;padding:10px;border-radius:8px;background:#faf8f3}
 .success{color:#6b8e23;background:#f0f4e8;border:1px solid #d4e4c0}
 </style>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-<script>
-pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
-</script>
 </head>
 
 <body>
+
 <div class="container">
   <h2>Konvertera ditt arbetsschema till kalenderfil</h2>
-  <div class="subtitle">Timecare .pdf-schemafil till .ics-kalenderfil. Ladda ner filen eller skicka den till din telefonmail och lägg in den i din kalender.</div>
+  <div class="subtitle">Timecare .csv-schemafil till .ics-kalenderfil. Ladda ner filen eller skicka den till din telefonmail och lägg in den i din kalender.</div>
 
   <div id="drop" class="drop">
     <div class="drop-icon">📄</div>
-    <div class="drop-text">Dra PDF hit eller klicka för att välja fil</div>
-    <input id="fileInput" type="file" accept="application/pdf" style="display:none" />
+    <div class="drop-text">Dra CSV-fil hit eller klicka för att välja fil</div>
+    <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" />
   </div>
 
   <div class="btn-group">
@@ -98,7 +113,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
     <table id="preview">
       <thead>
         <tr>
-          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Rast</th><th>Tid</th>
+          <th>Datum</th><th>Dag</th><th>Från</th><th>Till</th><th>Kod</th><th>Anteckningar</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -106,10 +121,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
       </tbody>
     </table>
   </div>
-  <div id="disclamer" class="note">Observera att jag inte tar något som helst ansvar över denna omvandlare eller annat! <br> Är det så att den inte funkar så skicka ett mail till mig, gärna med bifogad pdf. /Daniel</div>
+  <div id="disclamer" class="note">Observera att jag inte tar något som helst ansvar över denna omvandlare eller annat! <br> Är det så att den inte funkar så skicka ett mail till mig, gärna med bifogad csv. /Daniel</div>
 </div>
-
-
 
 <script>
 const drop=document.getElementById('drop');
@@ -130,29 +143,27 @@ fileInput.addEventListener('change',e=>handleFile(e.target.files[0]));
 
 async function handleFile(file){
   if(!file)return;
-  if(!file.name.toLowerCase().endsWith('.pdf')){alert('Välj en PDF-fil.');return;}
-  status.textContent='Läser PDF...';status.className='note';
+  const name=file.name.toLowerCase();
+  if(!name.endsWith('.csv')){alert('Välj en CSV-fil.');return;}
+  status.textContent='Läser CSV...';status.className='note';
   try{
-    const arrayBuffer=await file.arrayBuffer();
-    const doc=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
-    let text='';
-    for(let i=1;i<=doc.numPages;i++){
-      const page=await doc.getPage(i);
-      const content=await page.getTextContent();
-      text+=' '+content.items.map(it=>it.str).join(' ');
-    }
-    parsedRows=parseTable(text);
+    // Read with UTF-8, fall back to latin1 if needed
+    let text=await file.text();
+    // Strip BOM if present
+    if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+
+    parsedRows=parseCsv(text);
     if(parsedRows.length===0){
-      status.textContent='Inga rader hittade. Kontrollera PDF-format.';
+      status.textContent='Inga rader hittade. Kontrollera CSV-format.';
       preview.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;">Ingen data hittades</td></tr>';
-      downloadBtn.disabled=true;mailBtn.disabled=true;return;
+      downloadBtn.disabled=true;emailInput.disabled=true;sendBtn.disabled=true;return;
     }
     displayTable(parsedRows);
-    const validEvents=parsedRows.filter(r=>r.datum&&/^\d{4}$/.test(r.från)&&/^\d{4}$/.test(r.till)&&r.kod);
+    const validEvents=parsedRows.filter(isValidEvent);
     if(validEvents.length>0){
       lastIcs=buildIcs(validEvents);
       const today=new Date().toISOString().split('T')[0];
-      lastFilename=file.name.replace('.pdf','')+'_'+today+'.ics';
+      lastFilename=file.name.replace(/\.csv$/i,'')+'_'+today+'.ics';
       downloadBtn.disabled=false;
       emailInput.disabled=false;
       sendBtn.disabled=false;
@@ -160,52 +171,137 @@ async function handleFile(file){
       status.textContent=`✓ ${validEvents.length} arbetspass redo att exportera!`;
       status.className='note success';
     }else{
-      status.textContent=`Tabellen tolkad (${parsedRows.length} rader) men inga giltiga arbetspass hittade`;
+      status.textContent=`Tabellen tolkad (${parsedRows.length} rader) men inga giltiga arbetspass hittades`;
       status.className='note';
-      downloadBtn.disabled=true;
-      emailInput.disabled=true;
-      sendBtn.disabled=true;
+      downloadBtn.disabled=true;emailInput.disabled=true;sendBtn.disabled=true;
     }
   }catch(err){
-    console.error('PDF error:',err);
-    status.textContent='Fel vid läsning av PDF: '+(err.message||err);
+    console.error('CSV error:',err);
+    status.textContent='Fel vid läsning av CSV: '+(err.message||err);
     status.className='note';
   }
 }
 
-function parseTable(txt){
-  txt=txt.replace(/\s+/g,' ').trim();
-  const headerIndex=txt.indexOf("Vecka Datum Dag Från Till Kod Rast Tid Anteckningar");
-  if(headerIndex===-1)return[];
-  txt=txt.slice(headerIndex+50);
-  const rows=[],datePattern=/(20\d{2}-\d{2}-\d{2})/g;
-  const allDates=[];let m;while((m=datePattern.exec(txt))!==null)allDates.push({date:m[1],index:m.index});
-  for(let i=0;i<allDates.length;i++){
-    const startIdx=allDates[i].index;
-    const endIdx=i<allDates.length-1?allDates[i+1].index:txt.length;
-    const rowText=txt.slice(startIdx,endIdx).trim();
-    const rowMatch=rowText.match(
-      /(20\d{2}-\d{2}-\d{2})\s+([\p{L}]+)(?:\s+(\d{3,4}))?(?:\s+(\d{3,4}))?\s+([A-ZÅÄÖ\s]+?)(?=\s+\d+:\d+)(?:\s+(\d+:\d+))?(?:\s+(\d+:\d+))?/iu
-    );
-    if(rowMatch){
-      const[,datum,dag,fran,till,kod,rast,tid]=rowMatch;
-      rows.push({
-        datum,dag,
-        från:fixTime(fran||''),till:fixTime(till||''),
-        kod:(kod||'').trim(),rast:rast||'',tid:tid||''
-      });
+/**
+ * Parse the semicolon-delimited Timecare CSV.
+ * Finds the "Schema" section header row and reads data rows until an empty/summary line.
+ * Columns (0-based): Vecka | Datum | Dag | Från | Till | Kod | Rast | Tid | Arbetsplats | Anteckningar
+ */
+function parseCsv(text){
+  // Normalise line endings
+  const lines=text.split(/\r?\n/);
+
+  // Strip surrounding quotes and trim each cell
+  function parseRow(line){
+    return line.split(';').map(c=>c.replace(/^"|"$/g,'').trim());
+  }
+
+  // Find the header row that contains "Datum" and "Från"
+  let dataStart=-1;
+  for(let i=0;i<lines.length;i++){
+    const cells=parseRow(lines[i]);
+    // The schema header row has "Datum" in position 1 and "Från" in position 3
+    if(cells[1]==='Datum'&&cells[3]==='Från'){
+      dataStart=i+1;
+      break;
     }
+  }
+  if(dataStart===-1)return[];
+
+  const rows=[];
+  for(let i=dataStart;i<lines.length;i++){
+    const cells=parseRow(lines[i]);
+    // Stop at blank lines or summary sections (no date in col 1)
+    const datum=cells[1]||'';
+    if(!datum.match(/^\d{4}-\d{2}-\d{2}$/))continue; // skip rows without a valid date
+
+    const från=(cells[3]||'').replace(':','');  // "09:00" → "0900"
+    const till=(cells[4]||'').replace(':','');  // "18:00" → "1800"
+    const kod=(cells[5]||'').trim();
+    const rast=(cells[6]||'').trim();
+    const tid=(cells[7]||'').trim();
+    const anteckningar=(cells[9]||'').trim();
+
+    rows.push({
+      datum,
+      dag:cells[2]||'',
+      från,
+      till,
+      kod,
+      rast,
+      tid,
+      anteckningar
+    });
   }
   return rows;
 }
-function fixTime(s){return s?s.replace(/[^0-9]/g,'').padStart(4,'0'):'';}
+
+// A row is a valid calendar event if it has a date, start, end, and a non-empty code
+function isValidEvent(r){
+  return r.datum&&/^\d{4}$/.test(r.från)&&/^\d{4}$/.test(r.till)&&r.kod;
+}
+
 function displayTable(rows){
   preview.innerHTML='';
-  rows.forEach(r=>{
+  rows.forEach((r,idx)=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${r.datum}</td><td>${r.dag}</td><td>${r.från}</td><td>${r.till}</td><td>${r.kod}</td><td>${r.rast}</td><td>${r.tid}</td>`;
+    tr.dataset.index=idx;
+
+    // Display times back as HH:MM for readability
+    const fromDisp=r.från.length===4?r.från.slice(0,2)+':'+r.från.slice(2):'';
+    const tillDisp=r.till.length===4?r.till.slice(0,2)+':'+r.till.slice(2):'';
+
+    tr.innerHTML=`
+      <td>${r.datum}</td>
+      <td>${r.dag}</td>
+      <td>${fromDisp}</td>
+      <td>${tillDisp}</td>
+      <td>${r.kod}</td>
+      <td class="editable" data-index="${idx}">${r.anteckningar||''}</td>
+      <td class="delete-icon" data-index="${idx}" title="Ta bort rad">🗑️</td>
+    `;
     preview.appendChild(tr);
   });
+
+  document.querySelectorAll('.delete-icon').forEach(icon=>{
+    icon.addEventListener('click',function(){
+      const idx=parseInt(this.dataset.index);
+      if(confirm('Ta bort denna rad?')){
+        parsedRows.splice(idx,1);
+        displayTable(parsedRows);
+        updateIcs();
+        status.textContent='✓ Rad borttagen';
+        status.className='note success';
+        if(parsedRows.length===0){
+          downloadBtn.disabled=true;emailInput.disabled=true;sendBtn.disabled=true;
+          mailBtnContainer.classList.add('disabled');
+          preview.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;">Inga rader kvar</td></tr>';
+        }
+      }
+    });
+  });
+
+  document.querySelectorAll('.editable').forEach(cell=>{
+    cell.addEventListener('dblclick',function(){
+      const idx=parseInt(this.dataset.index);
+      const input=document.createElement('input');
+      input.type='text';input.className='edit-input';
+      input.value=parsedRows[idx].anteckningar||'';
+      this.innerHTML='';this.appendChild(input);input.focus();input.select();
+      function saveEdit(){
+        parsedRows[idx].anteckningar=input.value.trim();
+        cell.textContent=parsedRows[idx].anteckningar;
+        updateIcs();
+      }
+      input.addEventListener('blur',saveEdit);
+      input.addEventListener('keypress',e=>{if(e.key==='Enter')saveEdit();});
+    });
+  });
+}
+
+function updateIcs(){
+  const valid=parsedRows.filter(isValidEvent);
+  if(valid.length>0)lastIcs=buildIcs(valid);
 }
 
 function buildIcs(events){
@@ -219,13 +315,16 @@ function buildIcs(events){
     'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU','END:STANDARD','END:VTIMEZONE'
   ];
   for(const e of events){
-    const uid=e.datum.replace(/-/g,'')+e.från+e.till+Math.random().toString(36).slice(2,6)+'@pdf2ics';
+    const uid=e.datum.replace(/-/g,'')+e.från+e.till+Math.random().toString(36).slice(2,6)+'@csv2ics';
     lines.push('BEGIN:VEVENT');
     lines.push('UID:'+uid);
     lines.push('DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z');
     lines.push('DTSTART;TZID=Europe/Stockholm:'+e.datum.replace(/-/g,'')+'T'+e.från+'00');
     lines.push('DTEND;TZID=Europe/Stockholm:'+e.datum.replace(/-/g,'')+'T'+e.till+'00');
     lines.push('SUMMARY:'+e.kod);
+    if(e.anteckningar){
+      lines.push('DESCRIPTION:'+e.anteckningar.replace(/\n/g,'\\n'));
+    }
     lines.push('STATUS:CONFIRMED');
     lines.push('END:VEVENT');
   }
@@ -241,66 +340,36 @@ downloadBtn.addEventListener('click',()=>{
   URL.revokeObjectURL(url);
 });
 
-sendBtn.addEventListener('click', async () => {
-  
-  const email = emailInput.value.trim();
-  
-  if(!email){
-    status.textContent='⚠️ Ange en e-postadress';
-    status.className='note';
-    emailInput.focus();
-    return;
-  }
-  
-  if(!email.includes('@')||!email.includes('.')){
-    status.textContent='⚠️ Ange en giltig e-postadress';
-    status.className='note';
-    emailInput.focus();
-    return;
-  }
-  
-  try {
-    sendBtn.disabled = true;
-    emailInput.disabled = true;
-    status.textContent = '📧 Skickar e-post...';
-    status.className = 'note';
-    
-    const subject = 'Arbetsschema';
-    
-    const res = await fetch("https://knatsi.synology.me/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        to: email,
-        subject: subject, 
-        icsContent: lastIcs
-      })
+sendBtn.addEventListener('click',async()=>{
+  const email=emailInput.value.trim();
+  if(!email){status.textContent='⚠️ Ange en e-postadress';status.className='note';emailInput.focus();return;}
+  if(!email.includes('@')||!email.includes('.')){status.textContent='⚠️ Ange en giltig e-postadress';status.className='note';emailInput.focus();return;}
+  try{
+    sendBtn.disabled=true;emailInput.disabled=true;
+    status.textContent='📧 Skickar e-post...';status.className='note';
+    const res=await fetch("https://knatsi.synology.me/send-email",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({to:email,subject:'Arbetsschema',icsContent:lastIcs})
     });
-    
-    if (res.ok) {
-      status.textContent = '✅ E-post skickad till ' + email;
-      status.className = 'note success';
-      emailInput.value = '';
-    } else {
-      const errorData = await res.json().catch(()=>({}));
-      throw new Error(errorData.message || 'Failed to send email');
+    if(res.ok){
+      status.textContent='✅ E-post skickad till '+email;
+      status.className='note success';
+      emailInput.value='';
+    }else{
+      const err=await res.json().catch(()=>({}));
+      throw new Error(err.message||'Failed to send email');
     }
-  } catch (error) {
-    status.textContent = '❌ Kunde inte skicka e-post. Försök igen.';
-    status.className = 'note';
-    console.error('Email error:', error);
-  } finally {
-    setTimeout(() => {
-      sendBtn.disabled = false;
-      emailInput.disabled = false;
-    }, 2000);
+  }catch(error){
+    status.textContent='❌ Kunde inte skicka e-post. Försök igen.';
+    status.className='note';
+    console.error('Email error:',error);
+  }finally{
+    setTimeout(()=>{sendBtn.disabled=false;emailInput.disabled=false;},2000);
   }
 });
-emailInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    sendBtn.click();
-  }
-});
+
+emailInput.addEventListener('keypress',e=>{if(e.key==='Enter')sendBtn.click();});
 </script>
 </body>
 </html>
